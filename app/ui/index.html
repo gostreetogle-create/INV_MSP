@@ -250,6 +250,24 @@ tr.selected td { background: var(--violet-soft); }
   text-align: center; font-size: 11px; color: var(--muted-dark);
   margin-top: -4px; letter-spacing: 0.02em;
 }
+
+.help-box {
+  margin-top: 10px; padding: 14px 16px; border-radius: var(--radius-card);
+  background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-soft);
+}
+.help-box p { margin: 0 0 10px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+.help-box p:last-child { margin-bottom: 0; }
+.help-box b { color: var(--text-soft); font-weight: 500; }
+.help-box code {
+  background: var(--surface-strong, rgba(0,0,0,.3)); padding: 1px 5px; border-radius: 4px;
+  font-family: inherit;
+}
+
+.autosave-toggle {
+  display: inline-flex; align-items: center; gap: 6px; margin-left: 4px;
+  font-size: 12px; color: var(--muted); cursor: pointer; user-select: none;
+}
+.autosave-toggle input { accent-color: var(--violet); cursor: pointer; }
 </style>
 </head>
 <body>
@@ -275,6 +293,10 @@ tr.selected td { background: var(--violet-soft); }
       <button class="button button--primary" id="btnRefresh" title="Перечитать текущее состояние Inventor: какой документ активен, какие в нём правила и параметры">Обновить</button>
       <button class="button" id="btnOpen" title="Открыть существующий файл детали/сборки Inventor (.ipt/.iam/.idw) с диска, чтобы работать с ним здесь">Открыть файл…</button>
       <button class="button" id="btnSave" title="Сохранить документ, который сейчас активен в Inventor (см. строку статуса выше)">Сохранить</button>
+      <button class="button" id="btnCatalog" title="Открыть catalog.xlsx в Excel — типоразмеры труб/листов, крепёж, цвета, наименования">📖 Справочник</button>
+      <label class="autosave-toggle" title="Раз в 5 минут сохранять документ, активный в Inventor">
+        <input type="checkbox" id="autosaveToggle" /> Автосохранение
+      </label>
     </div>
 
     <div class="tabs" role="tablist">
@@ -289,11 +311,18 @@ tr.selected td { background: var(--violet-soft); }
     </div>
 
     <div class="tabpanel" id="tab-params">
-      <p class="hint">Параметры модели открытого документа. Кликните строку в таблице, впишите новое значение внизу и нажмите «Применить» — модель в Inventor пересчитается.</p>
+      <p class="hint">Параметры модели открытого документа. Кликните строку в таблице — текущее значение подставится ниже, поправьте и нажмите «Применить».</p>
       <table>
         <thead><tr><th>Параметр</th><th>Значение</th><th>Ед.</th></tr></thead>
         <tbody id="paramsBody"></tbody>
       </table>
+
+      <button type="button" class="catalog-link" id="btnToggleSystemParams" style="margin-top:10px">▸ Системные параметры (d0, d1…)</button>
+      <table id="systemParamsTable" style="display:none; margin-top:6px">
+        <thead><tr><th>Параметр</th><th>Значение</th><th>Ед.</th></tr></thead>
+        <tbody id="systemParamsBody"></tbody>
+      </table>
+
       <div class="edit-row">
         <input id="paramValue" placeholder="Сначала выберите параметр выше, затем впишите сюда значение" />
         <button class="button button--primary" id="btnApplyParam">Применить</button>
@@ -337,7 +366,6 @@ tr.selected td { background: var(--violet-soft); }
         <button type="button" class="active" data-category="sheet">Лист</button>
         <button type="button" data-category="tube">Труба</button>
       </div>
-      <button type="button" class="catalog-link" data-level="part" id="btnCatalog" style="display:none">📖 Открыть справочник типоразмеров (Excel)</button>
 
       <!-- 4. Типоразмер и размеры — зависят от типа детали -->
       <div class="form-grid">
@@ -396,6 +424,25 @@ tr.selected td { background: var(--violet-soft); }
       </div>
       <div class="create-result" id="createResult"></div>
     </div>
+  </div>
+
+  <button type="button" class="catalog-link" id="btnToggleHelp" style="margin-top:18px">▸ Как пользоваться пультом</button>
+  <div class="help-box" id="helpBox" style="display:none">
+    <p><b>Обновить</b> — перечитать состояние Inventor: активный документ, его правила и параметры.</p>
+    <p><b>Открыть файл…</b> — открыть в Inventor файл детали/сборки/чертежа с диска, если он ещё
+      не открыт (например, Inventor запущен, но нужный файл в нём не загружен, или вы хотите
+      сразу указать конкретный файл, а не искать его через меню Inventor). После открытия он
+      становится активным документом, и с ним можно работать через вкладки ниже.</p>
+    <p><b>Сохранить</b> — сохраняет тот документ, который сейчас активен в Inventor (показан в
+      строке статуса вверху справа), а не обязательно тот, что вы последним трогали в пульте.</p>
+    <p><b>iLogic-правила / Параметры</b> — работают с документом, который сейчас активен в
+      Inventor. Если нужного документа нет в списке — сначала откройте его или переключитесь на
+      него в самом Inventor и нажмите «Обновить».</p>
+    <p><b>Создать деталь</b> — обозначение подставляется автоматически по уже существующим файлам
+      в папке проекта, его можно поправить вручную; дубли обозначений блокируются.</p>
+    <p><b>Справочник</b> — открывает <code>catalog.xlsx</code> в Excel: типоразмеры труб/листов,
+      крепёж, цвета покрытия. Правьте прямо там, сохраняйте — пульт подхватит изменения при
+      следующем открытии вкладки «Создать деталь».</p>
   </div>
 </div>
 
@@ -464,23 +511,60 @@ async function loadRules() {
   }
 }
 
+const SYSTEM_PARAM_RE = /^d\d+$/i;
+
+function selectParamRow(tr, p) {
+  document.querySelectorAll('#paramsBody tr, #systemParamsBody tr').forEach((r) => r.classList.remove('selected'));
+  tr.classList.add('selected');
+  selectedParam = p.name;
+  document.getElementById('paramValue').value = p.expression;
+}
+
 async function loadParams() {
   const body = document.getElementById('paramsBody');
+  const sysBody = document.getElementById('systemParamsBody');
   body.innerHTML = '';
+  sysBody.innerHTML = '';
   try {
     const params = await api('list_parameters');
     params.forEach((p) => {
       const tr = document.createElement('tr');
       tr.innerHTML = `<td>${p.name}</td><td>${p.value}</td><td>${p.units || ''}</td>`;
-      tr.onclick = () => {
-        document.querySelectorAll('#paramsBody tr').forEach((r) => r.classList.remove('selected'));
-        tr.classList.add('selected');
-        selectedParam = p.name;
-      };
-      body.appendChild(tr);
+      tr.onclick = () => selectParamRow(tr, p);
+      (SYSTEM_PARAM_RE.test(p.name) ? sysBody : body).appendChild(tr);
     });
+    if (!body.children.length) {
+      body.innerHTML = '<tr><td colspan="3" class="empty">Нет пользовательских параметров</td></tr>';
+    }
   } catch (e) { /* no document open */ }
 }
+
+let autosaveTimer = null;
+document.getElementById('autosaveToggle').addEventListener('change', (e) => {
+  clearInterval(autosaveTimer);
+  if (!e.target.checked) { setEvent('Автосохранение выключено'); return; }
+  autosaveTimer = setInterval(async () => {
+    try { await api('save_document'); setEvent('Автосохранение: сохранено'); }
+    catch (err) { /* no active document right now — skip silently */ }
+  }, 5 * 60 * 1000);
+  setEvent('Автосохранение включено — каждые 5 минут');
+});
+
+document.getElementById('btnToggleHelp').onclick = () => {
+  const box = document.getElementById('helpBox');
+  const btn = document.getElementById('btnToggleHelp');
+  const show = box.style.display === 'none';
+  box.style.display = show ? '' : 'none';
+  btn.textContent = (show ? '▾' : '▸') + ' Как пользоваться пультом';
+};
+
+document.getElementById('btnToggleSystemParams').onclick = () => {
+  const table = document.getElementById('systemParamsTable');
+  const btn = document.getElementById('btnToggleSystemParams');
+  const show = table.style.display === 'none';
+  table.style.display = show ? '' : 'none';
+  btn.textContent = (show ? '▾' : '▸') + ' Системные параметры (d0, d1…)';
+};
 
 document.querySelectorAll('.tab').forEach((tab) => {
   tab.addEventListener('click', () => {
