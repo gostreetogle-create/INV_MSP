@@ -398,20 +398,21 @@ def create_sheet_part(designation, length_mm, width_mm, thickness_mm,
 
     length_cm, width_cm, thickness_cm = _mm(length_mm), _mm(width_mm), _mm(thickness_mm)
     params = compDef.Parameters.UserParameters
-    params.AddByExpression("Length", f"{length_mm} mm", "mm")
-    params.AddByExpression("Width", f"{width_mm} mm", "mm")
-    params.AddByExpression("Thickness", f"{thickness_mm} mm", "mm")
+    params.AddByExpression("Длина", f"{length_mm} mm", "mm")
+    params.AddByExpression("Ширина", f"{width_mm} mm", "mm")
+    params.AddByExpression("Толщина", f"{thickness_mm} mm", "mm")
 
     xy = compDef.WorkPlanes.Item(3)
     sketch = compDef.Sketches.Add(xy)
     rect = sketch.SketchLines.AddAsTwoPointRectangle(
         tg.CreatePoint2d(0, 0), tg.CreatePoint2d(length_cm, width_cm))
-    _fully_constrain_rectangle(sketch, tg, rect, length_cm, width_cm, "Length", "Width")
+    _fully_constrain_rectangle(sketch, tg, rect, length_cm, width_cm, "Длина", "Ширина")
 
     profile = sketch.Profiles.AddForSolid()
     extrudeDef = compDef.Features.ExtrudeFeatures.CreateExtrudeDefinition(profile, kNewBodyOperation)
     extrudeDef.SetDistanceExtent(thickness_cm, kPositiveExtentDirection)
-    compDef.Features.ExtrudeFeatures.Add(extrudeDef)
+    extrude = compDef.Features.ExtrudeFeatures.Add(extrudeDef)
+    extrude.Extent.Distance.Expression = "Толщина"
     doc.Update()
 
     _apply_pdm_properties(doc, designation, description or "Лист", material_name)
@@ -438,10 +439,10 @@ def create_tube_part(designation, outer_width_mm, outer_height_mm, wall_mm, leng
         raise ValueError("Толщина стенки не может быть больше половины меньшей стороны профиля")
 
     params = compDef.Parameters.UserParameters
-    params.AddByExpression("OuterWidth", f"{outer_width_mm} mm", "mm")
-    params.AddByExpression("OuterHeight", f"{outer_height_mm} mm", "mm")
-    params.AddByExpression("WallThickness", f"{wall_mm} mm", "mm")
-    params.AddByExpression("Length", f"{length_mm} mm", "mm")
+    params.AddByExpression("ШиринаНаружная", f"{outer_width_mm} mm", "mm")
+    params.AddByExpression("ВысотаНаружная", f"{outer_height_mm} mm", "mm")
+    params.AddByExpression("ТолщинаСтенки", f"{wall_mm} mm", "mm")
+    params.AddByExpression("Длина", f"{length_mm} mm", "mm")
 
     xy = compDef.WorkPlanes.Item(3)
     sketch = compDef.Sketches.Add(xy)
@@ -452,29 +453,30 @@ def create_tube_part(designation, outer_width_mm, outer_height_mm, wall_mm, leng
         tg.CreatePoint2d(t, t), tg.CreatePoint2d(w - t, h - t))
 
     outer_origin, _, _ = _fully_constrain_rectangle(
-        sketch, tg, outerRect, w, h, "OuterWidth", "OuterHeight")
+        sketch, tg, outerRect, w, h, "ШиринаНаружная", "ВысотаНаружная")
 
     inner_origin = _corner_of(innerRect, t, t)
     inner_far = _corner_of(innerRect, w - t, h - t)
-    # position the inner loop's near corner relative to the outer origin (both = WallThickness)
+    # position the inner loop's near corner relative to the outer origin (both = ТолщинаСтенки)
     dimPosX = sketch.DimensionConstraints.AddTwoPointDistance(
         outer_origin, inner_origin, kHorizontalDim, tg.CreatePoint2d(t / 2, -0.5), False)
     dimPosY = sketch.DimensionConstraints.AddTwoPointDistance(
         outer_origin, inner_origin, kVerticalDim, tg.CreatePoint2d(-0.5, t / 2), False)
-    dimPosX.Parameter.Expression = "WallThickness"
-    dimPosY.Parameter.Expression = "WallThickness"
+    dimPosX.Parameter.Expression = "ТолщинаСтенки"
+    dimPosY.Parameter.Expression = "ТолщинаСтенки"
     # size the inner loop itself, derived from the outer dimensions minus the wall
     dimInnerW = sketch.DimensionConstraints.AddTwoPointDistance(
         inner_origin, inner_far, kHorizontalDim, tg.CreatePoint2d((w) / 2, t / 2), False)
     dimInnerH = sketch.DimensionConstraints.AddTwoPointDistance(
         inner_origin, inner_far, kVerticalDim, tg.CreatePoint2d(t / 2, h / 2), False)
-    dimInnerW.Parameter.Expression = "OuterWidth - 2 * WallThickness"
-    dimInnerH.Parameter.Expression = "OuterHeight - 2 * WallThickness"
+    dimInnerW.Parameter.Expression = "ШиринаНаружная - 2 * ТолщинаСтенки"
+    dimInnerH.Parameter.Expression = "ВысотаНаружная - 2 * ТолщинаСтенки"
 
     profile = sketch.Profiles.AddForSolid()
     extrudeDef = compDef.Features.ExtrudeFeatures.CreateExtrudeDefinition(profile, kNewBodyOperation)
     extrudeDef.SetDistanceExtent(length, kPositiveExtentDirection)
-    compDef.Features.ExtrudeFeatures.Add(extrudeDef)
+    extrude = compDef.Features.ExtrudeFeatures.Add(extrudeDef)
+    extrude.Extent.Distance.Expression = "Длина"
     doc.Update()
 
     _apply_pdm_properties(
