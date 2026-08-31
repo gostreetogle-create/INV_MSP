@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<title>Inventor Pult</title>
+<style>
+:root {
+  color-scheme: dark;
+  --canvas: #05060f;
+  --surface: rgba(186, 214, 247, 0.028);
+  --line: rgba(186, 215, 247, 0.14);
+  --line-soft: rgba(186, 215, 247, 0.075);
+  --line-bright: rgba(199, 221, 255, 0.34);
+  --text-strong: #f4f7fc;
+  --text: #d5e5f8;
+  --text-soft: #c3cde0;
+  --muted: #a3aec3;
+  --muted-dark: #758097;
+  --violet: #7351ff;
+  --violet-bright: #8d72ff;
+  --violet-soft: rgba(115, 81, 255, 0.18);
+  --ice: #a9cfff;
+  --ok: #7ad99a;
+  --ok-soft: rgba(122, 217, 154, 0.13);
+  --warn: #e5bc69;
+  --danger: #f28d9c;
+  --radius-card: 12px;
+  --radius-pill: 999px;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --font-body: "Onest", "Segoe UI Variable Text", "Segoe UI", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background:
+    radial-gradient(circle at 50% -20%, rgba(113, 137, 184, 0.18), transparent 36rem),
+    var(--canvas);
+  color: var(--text-soft);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+}
+
+body {
+  overflow-y: auto;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(186, 215, 247, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(186, 215, 247, 0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.shell { width: min(calc(100% - 32px), 760px); margin-inline: auto; padding-top: 20px; padding-bottom: 24px; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.kicker {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+h1 {
+  margin: 4px 0 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+}
+
+.status-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--danger);
+  position: relative;
+}
+.dot.ok { background: var(--ok); }
+.dot.ok::after {
+  content: "";
+  position: absolute; inset: -5px;
+  border-radius: 50%;
+  border: 1px solid var(--ok);
+  animation: pulse 1.8s var(--ease-out) infinite;
+}
+@keyframes pulse {
+  0% { opacity: .8; transform: scale(.5); }
+  70%, 100% { opacity: 0; transform: scale(1.8); }
+}
+
+.panel {
+  margin-top: 18px;
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: linear-gradient(180deg, rgba(186, 214, 247, 0.026), rgba(5, 6, 15, 0.88)), #060813;
+  box-shadow:
+    inset 0 1px 0 rgba(216, 236, 248, 0.14),
+    inset 0 0 0 1px rgba(186, 215, 247, 0.10),
+    0 28px 56px rgba(0, 0, 0, 0.34);
+  padding: 20px;
+}
+
+.schematic { display: flex; align-items: center; justify-content: center; gap: 0; padding: 22px 0 10px; }
+.node {
+  padding: 10px 18px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  text-align: center;
+  min-width: 110px;
+}
+.node.active { box-shadow: inset 0 0 0 1px var(--violet-bright); color: var(--text-strong); }
+.route { flex: 1; height: 1px; max-width: 140px; position: relative; background: var(--line-soft); }
+.route .pulse {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, var(--ice), transparent);
+  background-size: 60px 100%;
+  background-repeat: no-repeat;
+  background-position: -60px 0;
+  opacity: 0;
+}
+.route.live .pulse { opacity: .9; animation: route-run 2.4s linear infinite; }
+@keyframes route-run { to { background-position: 200px 0; } }
+
+.event-line {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  min-height: 18px;
+  margin-top: 4px;
+}
+
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
+
+.button {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 38px; padding: 9px 16px;
+  border: 0; border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text);
+  font-size: 13px; font-weight: 500; font-family: inherit;
+  cursor: pointer;
+  transition: transform 150ms var(--ease-out), box-shadow 180ms ease;
+}
+.button:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px var(--line-bright); }
+.button:active { transform: translateY(1px) scale(.985); }
+.button--primary {
+  background: var(--violet);
+  color: var(--text-strong);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 12px 28px rgba(98,65,245,.26);
+}
+.button--primary:hover { box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 14px 32px rgba(98,65,245,.34); }
+
+.tabs { display: flex; gap: 4px; margin-top: 22px; padding: 4px; background: var(--surface); border-radius: var(--radius-pill); width: fit-content; }
+.tab {
+  border: 0; background: transparent; color: var(--muted);
+  padding: 7px 16px; border-radius: var(--radius-pill);
+  font-family: inherit; font-size: 12px; font-weight: 500; cursor: pointer;
+  letter-spacing: 0.02em;
+}
+.tab[aria-selected="true"] { background: var(--violet-soft); color: var(--text-strong); box-shadow: inset 0 0 0 1px rgba(141,114,255,.4); }
+
+.tabpanel { margin-top: 14px; display: none; }
+.tabpanel.is-visible { display: block; }
+
+.rule-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 4px; border-bottom: 1px solid var(--line-soft);
+  font-size: 13px; color: var(--text);
+}
+.rule-row:last-child { border-bottom: 0; }
+
+.empty { color: var(--muted-dark); font-size: 12px; text-align: center; padding: 18px 0; }
+
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { text-align: left; color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; padding: 6px 4px; border-bottom: 1px solid var(--line-soft); }
+td { padding: 8px 4px; border-bottom: 1px solid var(--line-soft); color: var(--text); }
+tr.selected td { background: var(--violet-soft); }
+
+.edit-row { display: flex; gap: 8px; margin-top: 12px; }
+.edit-row input {
+  flex: 1; background: var(--surface); border: 0; box-shadow: inset 0 0 0 1px var(--line);
+  border-radius: 8px; padding: 9px 12px; color: var(--text-strong); font-family: inherit; font-size: 13px;
+}
+.edit-row input:focus { outline: 2px solid var(--ice); outline-offset: 2px; }
+
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field.span-2 { grid-column: 1 / -1; }
+.field label {
+  font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+}
+.field input, .field select {
+  background: var(--surface); border: 0; box-shadow: inset 0 0 0 1px var(--line);
+  border-radius: 8px; padding: 9px 12px; color: var(--text-strong); font-family: inherit;
+  font-size: 13px;
+}
+.field input:focus, .field select:focus { outline: 2px solid var(--ice); outline-offset: 2px; }
+.field input.invalid { box-shadow: inset 0 0 0 1px var(--danger); }
+/* Native <option> popups ignore most parent styling in WebView2 unless set directly on <option>. */
+.field select option { background: #10131f; color: var(--text-strong); }
+.category-toggle { display: flex; gap: 8px; margin: 16px 0 12px; }
+.catalog-link {
+  display: inline-flex; align-items: center; gap: 6px; margin: 2px 0 14px;
+  font-size: 12px; color: var(--ice); background: none; border: 0; cursor: pointer;
+  font-family: inherit; padding: 0;
+}
+.catalog-link:hover { color: var(--text-strong); }
+.category-toggle button {
+  flex: 1; border: 0; padding: 10px; border-radius: 8px; background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); font-family: inherit;
+  font-size: 13px; cursor: pointer;
+}
+.category-toggle button.active { color: var(--text-strong); box-shadow: inset 0 0 0 1px var(--violet-bright); background: var(--violet-soft); }
+.create-result { margin-top: 12px; font-size: 12px; color: var(--ok); word-break: break-all; }
+
+.hint { font-size: 12px; color: var(--muted); margin: 0 0 14px; line-height: 1.5; }
+.dup-hint { font-size: 11px; margin-top: 4px; display: block; min-height: 14px; }
+.dup-hint.free { color: var(--ok); }
+.dup-hint.taken { color: var(--danger); }
+.schematic-caption {
+  text-align: center; font-size: 11px; color: var(--muted-dark);
+  margin-top: -4px; letter-spacing: 0.02em;
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div>
+      <div class="kicker">Inventor Bridge</div>
+      <h1>Пульт управления</h1>
+    </div>
+    <div class="status-chip"><span class="dot" id="statusDot"></span><span id="statusText">не подключено</span></div>
+  </div>
+
+  <div class="panel">
+    <div class="schematic">
+      <div class="node" id="nodePult">Пульт</div>
+      <div class="route" id="route"><div class="pulse"></div></div>
+      <div class="node" id="nodeInventor">Inventor</div>
+    </div>
+    <div class="schematic-caption">индикатор связи с Inventor — не кнопка</div>
+    <div class="event-line" id="eventLine"></div>
+
+    <div class="actions">
+      <button class="button button--primary" id="btnRefresh" title="Перечитать текущее состояние Inventor: какой документ активен, какие в нём правила и параметры">Обновить</button>
+      <button class="button" id="btnOpen" title="Открыть существующий файл детали/сборки Inventor (.ipt/.iam/.idw) с диска, чтобы работать с ним здесь">Открыть файл…</button>
+      <button class="button" id="btnSave" title="Сохранить документ, который сейчас активен в Inventor (см. строку статуса выше)">Сохранить</button>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-tab="rules">iLogic-правила</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="params">Параметры</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="create">Создать деталь</button>
+    </div>
+
+    <div class="tabpanel is-visible" id="tab-rules">
+      <p class="hint">iLogic-правила, уже сохранённые внутри открытого сейчас документа. Кнопка «Выполнить» запускает правило в Inventor — как если бы вы запустили его там вручную.</p>
+      <div id="rulesList"><div class="empty">Нет подключения</div></div>
+    </div>
+
+    <div class="tabpanel" id="tab-params">
+      <p class="hint">Параметры модели открытого документа. Кликните строку в таблице, впишите новое значение внизу и нажмите «Применить» — модель в Inventor пересчитается.</p>
+      <table>
+        <thead><tr><th>Параметр</th><th>Значение</th><th>Ед.</th></tr></thead>
+        <tbody id="paramsBody"></tbody>
+      </table>
+      <div class="edit-row">
+        <input id="paramValue" placeholder="Сначала выберите параметр выше, затем впишите сюда значение" />
+        <button class="button button--primary" id="btnApplyParam">Применить</button>
+      </div>
+    </div>
+
+    <div class="tabpanel" id="tab-create">
+      <p class="hint">Создаёт новый файл в Inventor с обозначением по вашей схеме нумерации и сохраняет его в папку проекта. Номер подставляется автоматически по уже существующим файлам — можно поправить вручную.</p>
+
+      <div class="category-toggle" id="levelToggle">
+        <button type="button" class="active" data-level="product">Изделие</button>
+        <button type="button" data-level="module">Модуль</button>
+        <button type="button" data-level="part">Деталь</button>
+      </div>
+
+      <!-- 1. Родительские номера — к какому изделию/модулю относится создаваемая запись -->
+      <div class="form-grid">
+        <div class="field" data-level="module,part">
+          <label>Номер изделия</label>
+          <input id="pProduct" type="number" list="productsDatalist" placeholder="напр. 1" />
+          <datalist id="productsDatalist"></datalist>
+        </div>
+        <div class="field" data-level="part">
+          <label>Номер модуля (0 — деталь не в модуле)</label>
+          <input id="pModule" type="number" list="modulesDatalist" placeholder="0" value="0" />
+          <datalist id="modulesDatalist"></datalist>
+        </div>
+      </div>
+
+      <!-- 2. Обозначение целиком — считается из уровня + родительских номеров, можно поправить -->
+      <div class="form-grid">
+        <div class="field span-2">
+          <label>Обозначение</label>
+          <input id="cDesignation" placeholder="1000.0000.0000" />
+          <span class="dup-hint" id="dupHint"></span>
+        </div>
+      </div>
+
+      <!-- 3. Тип детали — только на уровне "Деталь" -->
+      <div class="category-toggle" data-level="part" style="display:none">
+        <button type="button" class="active" data-category="sheet">Лист</button>
+        <button type="button" data-category="tube">Труба</button>
+      </div>
+      <button type="button" class="catalog-link" data-level="part" id="btnCatalog" style="display:none">📖 Открыть справочник типоразмеров (Excel)</button>
+
+      <!-- 4. Типоразмер и размеры — зависят от типа детали -->
+      <div class="form-grid">
+        <div class="field span-2" data-level="part" data-for="sheet" style="display:none">
+          <label>Типоразмер (необязательно)</label>
+          <select id="sheetPreset"><option value="">— свой размер —</option></select>
+        </div>
+        <div class="field" data-level="part" data-for="sheet" style="display:none">
+          <label>Длина, мм</label>
+          <input id="cLength" type="number" value="300" />
+        </div>
+        <div class="field" data-level="part" data-for="sheet" style="display:none">
+          <label>Ширина, мм</label>
+          <input id="cWidth" type="number" value="150" />
+        </div>
+        <div class="field" data-level="part" data-for="sheet" style="display:none">
+          <label>Толщина, мм</label>
+          <input id="cThickness" type="number" value="4" />
+        </div>
+
+        <div class="field span-2" data-level="part" data-for="tube" style="display:none">
+          <label>Типоразмер (необязательно)</label>
+          <select id="tubePreset"><option value="">— свой размер —</option></select>
+        </div>
+        <div class="field" data-level="part" data-for="tube" style="display:none">
+          <label>Внешняя ширина, мм</label>
+          <input id="tWidth" type="number" value="50" />
+        </div>
+        <div class="field" data-level="part" data-for="tube" style="display:none">
+          <label>Внешняя высота, мм</label>
+          <input id="tHeight" type="number" value="50" />
+        </div>
+        <div class="field" data-level="part" data-for="tube" style="display:none">
+          <label>Толщина стенки, мм</label>
+          <input id="tWall" type="number" value="3" />
+        </div>
+        <div class="field" data-level="part" data-for="tube" style="display:none">
+          <label>Длина, мм</label>
+          <input id="tLength" type="number" value="1000" />
+        </div>
+
+        <!-- 5. Общее для всех уровней -->
+        <div class="field span-2">
+          <label>Описание</label>
+          <input id="cDescription" placeholder="Необязательно" list="descriptionDatalist" />
+          <datalist id="descriptionDatalist"></datalist>
+        </div>
+        <div class="field span-2" data-level="part">
+          <label>Материал</label>
+          <select id="cMaterial"><option value="">— не задавать —</option></select>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="button button--primary" id="btnCreatePart">Создать</button>
+      </div>
+      <div class="create-result" id="createResult"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let selectedParam = null;
+
+function setEvent(text) {
+  document.getElementById('eventLine').textContent = text;
+}
+
+function api(name, ...args) {
+  return window.pywebview.api[name](...args);
+}
+
+async function refresh() {
+  const dot = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  const route = document.getElementById('route');
+  const nodeInv = document.getElementById('nodeInventor');
+  try {
+    const status = await api('get_status');
+    dot.classList.add('ok');
+    route.classList.add('live');
+    nodeInv.classList.add('active');
+    text.textContent = status.active_document
+      ? `Активен: ${status.active_document} (открыто документов: ${status.documents_open})`
+      : `${status.caption} · документов не открыто`;
+    await loadRules();
+    await loadParams();
+  } catch (e) {
+    dot.classList.remove('ok');
+    route.classList.remove('live');
+    nodeInv.classList.remove('active');
+    text.textContent = 'Inventor не найден';
+    document.getElementById('rulesList').innerHTML = '<div class="empty">Нет подключения</div>';
+    document.getElementById('paramsBody').innerHTML = '';
+  }
+}
+
+async function loadRules() {
+  const list = document.getElementById('rulesList');
+  try {
+    const rules = await api('list_ilogic_rules');
+    if (!rules.length) { list.innerHTML = '<div class="empty">В документе нет iLogic-правил</div>'; return; }
+    list.innerHTML = '';
+    rules.forEach((name) => {
+      const row = document.createElement('div');
+      row.className = 'rule-row';
+      row.innerHTML = `<span>${name}</span>`;
+      const btn = document.createElement('button');
+      btn.className = 'button button--primary';
+      btn.textContent = 'Выполнить';
+      btn.onclick = async () => {
+        setEvent(`Выполняется: ${name}…`);
+        try {
+          await api('run_ilogic_rule', name);
+          setEvent(`Готово: ${name}`);
+          await loadParams();
+        } catch (e) { setEvent(`Ошибка: ${e}`); }
+      };
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+  } catch (e) {
+    list.innerHTML = '<div class="empty">Нет открытого документа</div>';
+  }
+}
+
+async function loadParams() {
+  const body = document.getElementById('paramsBody');
+  body.innerHTML = '';
+  try {
+    const params = await api('list_parameters');
+    params.forEach((p) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${p.name}</td><td>${p.value}</td><td>${p.units || ''}</td>`;
+      tr.onclick = () => {
+        document.querySelectorAll('#paramsBody tr').forEach((r) => r.classList.remove('selected'));
+        tr.classList.add('selected');
+        selectedParam = p.name;
+      };
+      body.appendChild(tr);
+    });
+  } catch (e) { /* no document open */ }
+}
+
+document.querySelectorAll('.tab').forEach((tab) => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', 'false'));
+    document.querySelectorAll('.tabpanel').forEach((p) => p.classList.remove('is-visible'));
+    tab.setAttribute('aria-selected', 'true');
+    document.getElementById(`tab-${tab.dataset.tab}`).classList.add('is-visible');
+  });
+});
+
+document.getElementById('btnRefresh').onclick = refresh;
+document.getElementById('btnSave').onclick = async () => {
+  try { await api('save_document'); setEvent('Сохранено'); } catch (e) { setEvent(`Ошибка: ${e}`); }
+};
+document.getElementById('btnOpen').onclick = async () => {
+  try {
+    const opened = await api('open_document_dialog');
+    if (opened) { setEvent(`Открыто: ${opened}`); await refresh(); }
+  } catch (e) { setEvent(`Ошибка: ${e}`); }
+};
+document.getElementById('btnApplyParam').onclick = async () => {
+  const val = document.getElementById('paramValue').value;
+  if (!selectedParam || !val) return;
+  try {
+    await api('set_parameter', selectedParam, val);
+    setEvent(`${selectedParam} = ${val}`);
+    await loadParams();
+  } catch (e) { setEvent(`Ошибка: ${e}`); }
+};
+
+let currentLevel = 'product';
+let currentCategory = 'sheet';
+let designationTouchedByUser = false;
+
+function applyCreateVisibility() {
+  document.querySelectorAll('[data-level]').forEach((el) => {
+    // #levelToggle's own buttons use data-level to say "which level I switch to" —
+    // that's a different meaning from "only show me at this level" used everywhere else.
+    if (el.closest('#levelToggle')) return;
+    const levels = el.dataset.level.split(',');
+    const show = levels.includes(currentLevel);
+    if (el.matches('.field, .category-toggle, button')) el.style.display = show ? '' : 'none';
+  });
+  if (currentLevel === 'part') {
+    document.querySelectorAll('[data-for]').forEach((f) => {
+      f.style.display = f.dataset.for === currentCategory ? '' : 'none';
+    });
+  }
+}
+
+async function populateProductsDatalist() {
+  try {
+    const products = await api('list_known_products');
+    document.getElementById('productsDatalist').innerHTML =
+      products.map((p) => `<option value="${p}">`).join('');
+  } catch (e) { /* not connected */ }
+}
+
+async function populateModulesDatalist() {
+  const product = document.getElementById('pProduct').value;
+  const list = document.getElementById('modulesDatalist');
+  if (!product) { list.innerHTML = ''; return; }
+  try {
+    const modules = await api('list_known_modules', product);
+    list.innerHTML = modules.map((m) => `<option value="${m}">`).join('');
+  } catch (e) { list.innerHTML = ''; }
+}
+
+document.getElementById('levelToggle').querySelectorAll('button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    currentLevel = btn.dataset.level;
+    document.getElementById('levelToggle').querySelectorAll('button').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    designationTouchedByUser = false;
+    applyCreateVisibility();
+    if (currentLevel !== 'product') populateProductsDatalist();
+    autoSuggest();
+  });
+});
+
+document.querySelectorAll('[data-category]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    currentCategory = btn.dataset.category;
+    btn.parentElement.querySelectorAll('button').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyCreateVisibility();
+  });
+});
+
+document.getElementById('pProduct').addEventListener('input', () => {
+  designationTouchedByUser = false;
+  populateModulesDatalist();
+  autoSuggest();
+});
+document.getElementById('pModule').addEventListener('input', () => { designationTouchedByUser = false; autoSuggest(); });
+
+document.getElementById('btnCatalog').onclick = async () => {
+  try { await api('open_catalog'); setEvent('Справочник открыт в Excel'); }
+  catch (e) { setEvent(`Ошибка: ${e}`); }
+};
+
+async function loadPresets() {
+  try {
+    const tubes = await api('list_tube_presets');
+    const tubeSelect = document.getElementById('tubePreset');
+    tubes.forEach((t, i) => {
+      const opt = document.createElement('option');
+      opt.value = i; opt.textContent = `${t.name} (стенка ${t.wall_mm} мм)`;
+      opt.dataset.width = t.width_mm; opt.dataset.height = t.height_mm; opt.dataset.wall = t.wall_mm;
+      tubeSelect.appendChild(opt);
+    });
+    const tubeRawFields = ['tWidth', 'tHeight', 'tWall'].map((id) => document.getElementById(id).closest('.field'));
+    tubeSelect.onchange = () => {
+      const opt = tubeSelect.selectedOptions[0];
+      const isPreset = !!opt.dataset.width;
+      tubeRawFields.forEach((f) => { f.style.display = isPreset ? 'none' : ''; });
+      if (!isPreset) return;
+      document.getElementById('tWidth').value = opt.dataset.width;
+      document.getElementById('tHeight').value = opt.dataset.height;
+      document.getElementById('tWall').value = opt.dataset.wall;
+    };
+
+    const thicknesses = await api('list_sheet_thicknesses');
+    const sheetSelect = document.getElementById('sheetPreset');
+    thicknesses.forEach((t) => {
+      const opt = document.createElement('option');
+      opt.value = t; opt.textContent = `${t} мм`;
+      sheetSelect.appendChild(opt);
+    });
+    const thicknessField = document.getElementById('cThickness').closest('.field');
+    sheetSelect.onchange = () => {
+      const isPreset = !!sheetSelect.value;
+      thicknessField.style.display = isPreset ? 'none' : '';
+      if (isPreset) document.getElementById('cThickness').value = sheetSelect.value;
+    };
+  } catch (e) { /* not connected yet */ }
+}
+
+const DESIGNATION_RE = /^\d{4}\.\d{4}\.\d{4}$/;
+
+async function autoSuggest() {
+  if (designationTouchedByUser) return;
+  const designationInput = document.getElementById('cDesignation');
+  const product = document.getElementById('pProduct').value;
+  const module = document.getElementById('pModule').value;
+  if (currentLevel !== 'product' && !product) { designationInput.value = ''; return; }
+  try {
+    designationInput.value = await api('suggest_designation', currentLevel, product, module);
+    await checkDuplicate();
+  } catch (e) { /* Inventor not connected yet */ }
+}
+
+let dupTimer = null;
+document.getElementById('cDesignation').addEventListener('input', () => {
+  designationTouchedByUser = true;
+  const hint = document.getElementById('dupHint');
+  hint.className = 'dup-hint';
+  hint.textContent = 'Проверяю…';
+  clearTimeout(dupTimer);
+  dupTimer = setTimeout(checkDuplicate, 300);
+});
+
+async function checkDuplicate() {
+  const designationInput = document.getElementById('cDesignation');
+  const hint = document.getElementById('dupHint');
+  const designation = designationInput.value.trim();
+  designationInput.classList.remove('invalid');
+  if (!DESIGNATION_RE.test(designation)) {
+    hint.className = 'dup-hint';
+    hint.textContent = designation ? 'Формат должен быть 0000.0000.0000' : '';
+    return;
+  }
+  try {
+    const exists = await api('designation_exists', designation);
+    hint.className = 'dup-hint ' + (exists ? 'taken' : 'free');
+    hint.textContent = exists ? 'Такое обозначение уже занято' : 'Обозначение свободно';
+  } catch (e) { hint.className = 'dup-hint'; hint.textContent = ''; }
+}
+
+async function loadMaterials() {
+  const select = document.getElementById('cMaterial');
+  try {
+    const materials = await api('list_materials');
+    materials.forEach((m) => {
+      const opt = document.createElement('option');
+      opt.value = m; opt.textContent = m;
+      select.appendChild(opt);
+    });
+  } catch (e) { /* Inventor not connected yet */ }
+}
+
+document.getElementById('btnCreatePart').onclick = async () => {
+  const designationInput = document.getElementById('cDesignation');
+  const designation = designationInput.value.trim();
+  const resultEl = document.getElementById('createResult');
+  designationInput.classList.toggle('invalid', !DESIGNATION_RE.test(designation));
+  if (!DESIGNATION_RE.test(designation)) {
+    resultEl.style.color = 'var(--danger)';
+    resultEl.textContent = 'Обозначение должно быть в формате 0000.0000.0000';
+    return;
+  }
+  const description = document.getElementById('cDescription').value;
+  resultEl.style.color = 'var(--muted)';
+  resultEl.textContent = 'Создаю…';
+  try {
+    let result;
+    if (currentLevel !== 'part') {
+      result = await api('create_assembly', designation, description);
+    } else {
+      const material = document.getElementById('cMaterial').value;
+      if (currentCategory === 'sheet') {
+        result = await api('create_sheet_part', designation,
+          document.getElementById('cLength').value,
+          document.getElementById('cWidth').value,
+          document.getElementById('cThickness').value,
+          description, material);
+      } else {
+        result = await api('create_tube_part', designation,
+          document.getElementById('tWidth').value,
+          document.getElementById('tHeight').value,
+          document.getElementById('tWall').value,
+          document.getElementById('tLength').value,
+          description, material);
+      }
+    }
+    resultEl.style.color = 'var(--ok)';
+    resultEl.textContent = `Создано: ${result.path}`;
+    setEvent(`Создано: ${result.designation}`);
+    designationTouchedByUser = false;
+    await refresh();
+    await populateProductsDatalist();
+    await populateModulesDatalist();
+    await autoSuggest();
+  } catch (e) {
+    resultEl.style.color = 'var(--danger)';
+    resultEl.textContent = `Ошибка: ${e}`;
+  }
+};
+
+function resetCreateForm() {
+  // WebView2 can restore a previous JS/DOM state on relaunch (bfcache-like behaviour) —
+  // force known defaults every time the window opens instead of trusting whatever the
+  // markup/classList currently shows.
+  currentLevel = 'product';
+  currentCategory = 'sheet';
+  designationTouchedByUser = false;
+  document.getElementById('levelToggle').querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.level === 'product'));
+  document.querySelectorAll('[data-category]').forEach((b) => b.classList.toggle('active', b.dataset.category === 'sheet'));
+  document.getElementById('pProduct').value = '';
+  document.getElementById('pModule').value = '0';
+  document.getElementById('tubePreset').innerHTML = '<option value="">— свой размер —</option>';
+  document.getElementById('sheetPreset').innerHTML = '<option value="">— свой размер —</option>';
+  ['tWidth', 'tHeight', 'tWall', 'cThickness'].forEach((id) => {
+    document.getElementById(id).closest('.field').style.display = '';
+  });
+  applyCreateVisibility();
+}
+
+async function loadDescriptionTemplates() {
+  try {
+    const names = await api('list_part_name_templates');
+    document.getElementById('descriptionDatalist').innerHTML = names.map((n) => `<option value="${n}">`).join('');
+  } catch (e) { /* not connected yet */ }
+}
+
+window.addEventListener('pywebviewready', () => {
+  refresh();
+  loadMaterials();
+  resetCreateForm();
+  populateProductsDatalist();
+  loadPresets();
+  loadDescriptionTemplates();
+  autoSuggest();
+});
+</script>
+</body>
+</html>
